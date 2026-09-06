@@ -9,3 +9,5 @@ Community marketplace for second-hand clothes (small business, one admin).
   before proposing new work, and keep it updated when plans change.
 - Product changes go through the OpenSpec workflow (`openspec/`), one
   incremental change at a time.
+- Keep `README.md` up to date as the project evolves — especially the status
+  section, the tech stack table, and the doc links.
