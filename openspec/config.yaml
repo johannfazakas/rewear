@@ -1,0 +1,51 @@
+schema: spec-driven
+
+context: |
+  rewear: community marketplace for second-hand clothes (small business, one
+  admin). Full architecture, C4 diagrams, and decision records with rationale:
+  docs/ARCHITECTURE.md — changes must conform to it or explicitly revisit the
+  relevant ADR. Anticipated changes and deferred features: docs/ROADMAP.md —
+  consult it when scoping a change and update it when plans shift.
+
+  Tech stack:
+  - Backend: Kotlin + Ktor modular monolith (modules: listings, favorites,
+    catalog, admin/moderation), REST API-first, serves all clients; ships as
+    a GraalVM native image — libraries must be native-friendly
+    (kotlinx.serialization not Jackson, CIO engine, no classpath-scanning DI,
+    no Hibernate); dev/tests on JVM, CI smoke-tests the native binary
+  - Web (user + admin, separate apps): React + TypeScript, static builds
+  - Mobile: Kotlin Multiplatform + Compose (Android first, iOS later)
+  - Data: Postgres (incl. search); photos via S3 API — Backblaze B2 in prod
+    (served via Cloudflare-proxied CNAME), Garage container in local dev;
+    clients load photos by URL, never via API
+  - Auth: delegated to self-hosted Zitadel (OIDC, social login + email magic
+    link); clients use Auth Code + PKCE; API validates JWT access tokens
+    offline (JWKS) and reads member/admin role claims; ownership checks are
+    app logic; local users table JIT-provisioned, keyed by token sub
+  - Deploy: everything is an OCI container, env-var config, standard protocols
+    only (OIDC/SQL/S3/SMTP) — no provider-proprietary services. Prod: Docker
+    Compose on one Hetzner VPS behind Caddy (auto-HTTPS); k3s is a planned
+    future change. Images on GHCR: rewear-api + rewear-proxy (Caddy with the
+    SPAs baked in), tagged sha-<short> per main commit; prod pins SHA tags,
+    never latest; third-party images version-pinned
+
+  Photos: API generates fixed size variants (thumbnail/detail) at upload;
+  list endpoints return thumbnail URLs; clients paginate and lazy-load.
+
+  Domain rules (iteration 1): listings have photos, title, description,
+  exactly one admin-managed category, one fixed size (XS/S/M/L/XL). Members
+  can favorite listings. No transactions, payments, or member-to-member
+  contact yet. Admin can manage categories, remove listings, block users.
+
+  Conventions: unit test names use given-when-then; no explanatory comments
+  in code.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
