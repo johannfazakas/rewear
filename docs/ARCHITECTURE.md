@@ -118,9 +118,10 @@ Subdomain layout: `app.` (user web) · `admin.` (admin web) · `api.` (Ktor) ·
 `auth.` (Zitadel) · `images.` (Cloudflare-proxied CNAME → B2 public bucket).
 
 C4 Level 3 is intentionally not documented up front: components emerge from
-incremental changes. The module list above (listings, favorites, catalog,
-admin/moderation, plus users/identity glue) is the seam map new capabilities
-should slot into.
+incremental changes. The module map new capabilities should slot into is the
+refined decomposition recorded in ADR-4's 2026-09 revision — `users` and
+`catalog` domain modules, plus `app` and `common` — not the finer seam list
+sketched in the diagram above.
 
 ## 4. Decision records
 
@@ -162,6 +163,25 @@ them, and extraction stays possible if ever justified. Kotlin matches the
 team's JVM background and the mobile stack; Ktor over Spring for a lighter,
 more modern playground. **Rejected:** microservices (ceremony); Spring Boot
 (fine, but heavier and less to learn).
+
+**Revised 2026-09 (project-scaffolding change):** the original seam list
+(listings, favorites, catalog, admin/moderation, + users glue) proved finer than
+iteration-1 responsibilities justify. Refined decomposition: two domain Gradle
+modules — **`users`** (identity: local users, JIT provisioning, profile, blocked
+flag; the dependency leaf) and **`catalog`** (the domain core: listings,
+categories, and favorites as internal packages) — plus **`app`** (composition
+root) and **`common`** (shared kernel). *Categories* fold into `catalog` (a
+lookup that exists only to classify listings, not a standalone module).
+*Admin/moderation* is **not** a module — admin operations are role-guarded
+endpoints inside the owning module, and the `admin` role check is shared auth
+middleware; a moderation module appears only if it grows real domain (audit,
+reports). *Favorites* is a package inside `catalog`, promotable later if it earns
+it. Boundaries are enforced by the Gradle build graph plus Kotlin `internal`
+visibility (no separate `-api`/`-service` contract modules needed), with
+**Konsist** policing package boundaries within `catalog` and cross-cutting rules.
+Cross-module data is referenced by plain ID (no cross-module foreign keys); each
+module owns its tables. The "enforced boundaries" principle stands unchanged;
+only the seam count and enforcement mechanism are refined.
 
 ### ADR-5: Client technologies
 
@@ -326,6 +346,22 @@ option for the modular monolith without changing the architecture; peak-JIT
 throughput loss is irrelevant at this scale. **Rejected:** plain JVM with a
 tuned small heap (works, ~2–3× the footprint); trimming memory by splitting
 services (opposite of ADR-4).
+
+**Revised 2026-09 (project-scaffolding change):** the persistence path uses
+**R2DBC** (Exposed R2DBC module over `r2dbc-postgresql` + `r2dbc-pool`), not
+blocking JDBC, for the runtime request path. This is a deliberate departure from
+the "JDBC with a thin layer" consequence above, taken as a learning experiment
+with the reactive stack; it is explicitly **not** driven by a scale need (ADR-6
+traffic does not require non-blocking DB). Consequences: R2DBC brings Netty +
+Reactor, which work under GraalVM native images but require hand-supplied
+reachability metadata (no AOT framework here) — the CI native build validates
+that continuously. **Flyway stays JDBC-only**, running migrations over a plain
+pgJDBC connection at startup only; pgJDBC therefore remains a dependency but
+never runs on the request path. The original blocking **JDBC + HikariCP +
+`Dispatchers.IO`** stack is the documented fallback if the R2DBC native-image
+metadata proves intractable — reverting is cheap under ADR-9. All other ADR-13
+library constraints (kotlinx.serialization, CIO, no classpath-scanning DI, no
+Hibernate/JPA, Flyway) stand unchanged.
 
 ## 5. Open questions
 
