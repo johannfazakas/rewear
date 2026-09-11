@@ -59,28 +59,6 @@ graalvmNative {
                     "kotlin.DeprecationLevel,kotlin.annotation.AnnotationRetention," +
                     "kotlin.annotation.AnnotationTarget,kotlin.coroutines.intrinsics.CoroutineSingletons",
             )
-            // Reachability metadata: agent-generated set (com.rewear/app) unioned with a
-            // hand-maintained safety net for Flyway plugins the agent run did not exercise
-            // (com.rewear/extra). Referenced explicitly so loading does not depend on
-            // classpath auto-detection.
-            buildArgs.add(
-                "-H:ReflectionConfigurationResources=" +
-                    "META-INF/native-image/com.rewear/app/reflect-config.json," +
-                    "META-INF/native-image/com.rewear/extra/reflect-config.json",
-            )
-            buildArgs.add(
-                "-H:ResourceConfigurationResources=" +
-                    "META-INF/native-image/com.rewear/app/resource-config.json," +
-                    "META-INF/native-image/com.rewear/extra/resource-config.json",
-            )
-            buildArgs.add(
-                "-H:SerializationConfigurationResources=" +
-                    "META-INF/native-image/com.rewear/app/serialization-config.json",
-            )
-            buildArgs.add(
-                "-H:JNIConfigurationResources=" +
-                    "META-INF/native-image/com.rewear/app/jni-config.json",
-            )
         }
     }
 }

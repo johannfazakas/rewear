@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
       - uses: gradle/actions/setup-gradle@v4
       # Runs unit tests, the Konsist architecture tests, and the Testcontainers
       # migration integration test (Docker is available on ubuntu runners).

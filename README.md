@@ -48,7 +48,7 @@ SMTP), deployable to a cheap VPS, Kubernetes, or local servers unchanged.
 
 ## Running locally
 
-Prerequisites: Docker, and a JDK 21 (the API uses the Gradle wrapper).
+Prerequisites: Docker, and a JDK 25 (the API uses the Gradle wrapper).
 
 ```bash
 # 1. Start the dev stack (Postgres, Zitadel, Garage) — third-party images pinned.

@@ -48,13 +48,18 @@ anticipated and why it is sequenced this way.
 
 ## Later — deferred by explicit decision
 
-- **Bump to GraalVM 25 LTS** — move the API toolchain from GraalVM 21 / JDK 21 to
-  GraalVM 25 (JDK 25) and native-build-tools 0.10.4 → 1.1.x, adopt the unified
-  `reachability-metadata.json` format (regenerated via the JDK 25 tracing agent,
-  replacing the five split `*-config.json` files), and drop the explicit
-  `-H:*ConfigurationResources` build args. Low-urgency maintenance follow-up to
-  project scaffolding — the deprecated per-file format still works — so it is
-  scheduled deliberately, not forced. See the `bump-to-graalvm-25` OpenSpec change.
+- **Lift the Kotlin JVM bytecode target 24 → 25** — the `bump-to-graalvm-25` change put
+  the toolchain on GraalVM 25 (JDK 25) but caps bytecode at **JVM 24**, because no
+  released Kotlin exposes `JvmTarget.JVM_25` (2.2.21 maxes at 24). Once a Kotlin release
+  adds JVM 25, bump `jvmTarget` (and the aligned Java `source/targetCompatibility`) from
+  24 to 25. Purely cosmetic alignment — the native image and JDK 25 runtime already
+  consume JVM 24 bytecode fine — so low urgency.
+
+  _Done (see `openspec/changes/archive/…/bump-to-graalvm-25`): GraalVM 25 / JDK 25,
+  native-build-tools 1.1.12, and — forced by JDK 25 — Gradle 9.7.1, Kotlin 2.2.21, Ktor
+  3.5.2. Unified `reachability-metadata.json` (agent-generated reflection+resources in
+  `com.rewear/app/`, hand-maintained AWT/Java2D JNI in `com.rewear/awt/`), `-H` resource
+  args dropped. Verified by a native smoke test on the Linux production image._
 
 - **CI path filters — build images only for actual code changes** — the
   `.github/workflows/ci.yml` pipeline currently runs on every push to `main`,

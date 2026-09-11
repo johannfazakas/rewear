@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # JVM dev image: fat jar on a JRE base. Config comes entirely from env vars (ADR-9).
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 COPY . .
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :app:buildFatJar
 
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 ARG GIT_SHA=unknown
 ENV GIT_SHA=$GIT_SHA

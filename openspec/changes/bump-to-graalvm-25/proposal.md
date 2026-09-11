@@ -18,8 +18,14 @@ so this is a deliberate, low-risk maintenance bump — not a fix.
   and the JVM image base `eclipse-temurin:21-*` → `25-*` (`Dockerfile.jvm`).
 - Bump the native builder image `ghcr.io/graalvm/native-image-community:21` → `:25`
   (`Dockerfile.native`).
-- Bump **native-build-tools 0.10.4 → 1.1.x** in the version catalog (verify Gradle
-  compatibility; bump the Gradle wrapper if the plugin requires it).
+- Bump **native-build-tools 0.10.4 → 1.1.12** in the version catalog.
+- **Forced toolchain cascade** (discovered during implementation — see design
+  Decision 6): moving to JDK 25 mandates **Gradle 8.11.1 → 9.7.1** (8.11.1 cannot run
+  on JDK 25, and both Dockerfiles + CI run Gradle inside JDK-25-only environments) and
+  **Kotlin 2.1.0 → 2.2.21** (2.1.0 cannot run on JDK 25). The Gradle 9 bump in turn
+  forces **Ktor 3.0.3 → 3.5.2** (Ktor 3.0.3's bundled Shadow plugin breaks on Gradle 9).
+  Bytecode target is **JVM 24, not 25** — no released Kotlin can emit JVM 25 bytecode
+  yet; the toolchain runs on GraalVM 25 while compiling to JVM 24.
 - **Regenerate native reachability metadata** with the JDK 25 tracing agent so it
   emits a single unified `reachability-metadata.json`, replacing the five split
   `reflect-config.json` / `resource-config.json` / `jni-config.json` /

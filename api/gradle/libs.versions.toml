@@ -1,6 +1,6 @@
 [versions]
-kotlin = "2.1.0"
-ktor = "3.0.3"
+kotlin = "2.2.21"
+ktor = "3.5.2"
 koin = "4.0.0"
 exposed = "1.0.0-beta-2"
 r2dbc-postgresql = "1.0.7.RELEASE"
@@ -12,7 +12,7 @@ konsist = "0.17.3"
 logback = "1.5.12"
 junit = "5.11.3"
 testcontainers = "1.20.4"
-native-build-tools = "0.10.4"
+native-build-tools = "1.1.12"
 
 [libraries]
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
