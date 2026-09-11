@@ -56,6 +56,13 @@ anticipated and why it is sequenced this way.
   project scaffolding — the deprecated per-file format still works — so it is
   scheduled deliberately, not forced. See the `bump-to-graalvm-25` OpenSpec change.
 
+- **CI path filters — build images only for actual code changes** — the
+  `.github/workflows/ci.yml` pipeline currently runs on every push to `main`,
+  including docs/`openspec/**`-only commits, so a one-line README or spec change
+  triggers the full ~5-minute GraalVM native build, smoke test, and GHCR
+  republish. Add `paths-ignore:` (or path filters) so non-code changes skip the
+  image pipeline (and ideally run only the JVM tests, or nothing). Small tooling
+  optimization; do it opportunistically alongside the next `ci.yml` edit.
 
 - **Member contact mechanism** — how buyers reach sellers. Mechanism
   undecided (reveal contact info vs. email relay vs. in-app chat); the choice
