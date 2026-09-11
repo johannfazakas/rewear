@@ -8,14 +8,22 @@ anticipated and why it is sequenced this way.
 
 ## Iteration 0 — foundations
 
-1. **Project scaffolding** — Ktor monolith skeleton with the module seams
-   (listings, favorites, catalog, admin/moderation), native-friendly library
-   choices per ADR-13, local `docker compose` (Postgres, Zitadel, Garage),
-   health endpoint, CI building both a JVM dev image and the GraalVM native
-   production image to GHCR with smoke tests against the native binary.
-   Includes the ADR-13 spike: prove image resizing (ADR-12) works under
-   native compilation, else fall back to client-side resizing. First,
-   because every later change lands in a runnable system.
+1. **Project scaffolding** — ✅ **done** (see [`api/`](../api/), `docker-compose.yml`,
+   `.github/workflows/ci.yml`). Ktor modular-monolith skeleton with the refined
+   ADR-4 seams (`common` / `users` / `catalog` / `app`; listings, categories,
+   favorites are packages in `catalog`), native-friendly library baseline per
+   ADR-13 (Ktor CIO, kotlinx.serialization, Koin, Exposed R2DBC, Flyway), local
+   `docker compose` (Postgres, Zitadel, Garage), `/health` reporting the git SHA,
+   and CI building both a JVM dev image and the GraalVM native production image to
+   GHCR with a smoke test against the native binary. **The ADR-13 image-resize
+   spike is confirmed under the native image** (server-side resizing works; no
+   client-side fallback needed). The native image boots in ~2 s at ~35 MB RSS.
+   Follow-ups surfaced during the native build: reachability metadata is generated
+   via the GraalVM tracing agent and validated by the CI native build each commit
+   (documented fallback if R2DBC/Netty ever proves intractable is blocking JDBC +
+   HikariCP, ADR-13 revision); Flyway can't scan classpath dirs in a native image,
+   so native runs migrations from filesystem-baked SQL (D9's later move of
+   migrations to a pre-deploy step will retire this).
 2. **Production environment** — VPS compose stack behind Caddy, deploy
    pipeline, and a documented manual `pg_dump`-to-B2 command (scheduled
    backups are deferred to the k3s change per ADR-11). Depends on the manual
@@ -39,6 +47,15 @@ anticipated and why it is sequenced this way.
    user web app may follow later within the iteration.
 
 ## Later — deferred by explicit decision
+
+- **Bump to GraalVM 25 LTS** — move the API toolchain from GraalVM 21 / JDK 21 to
+  GraalVM 25 (JDK 25) and native-build-tools 0.10.4 → 1.1.x, adopt the unified
+  `reachability-metadata.json` format (regenerated via the JDK 25 tracing agent,
+  replacing the five split `*-config.json` files), and drop the explicit
+  `-H:*ConfigurationResources` build args. Low-urgency maintenance follow-up to
+  project scaffolding — the deprecated per-file format still works — so it is
+  scheduled deliberately, not forced. See the `bump-to-graalvm-25` OpenSpec change.
+
 
 - **Member contact mechanism** — how buyers reach sellers. Mechanism
   undecided (reveal contact info vs. email relay vs. in-app chat); the choice

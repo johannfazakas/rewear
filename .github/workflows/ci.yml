@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/rewear-api
+
+jobs:
+  build-test:
+    name: JVM build, unit + architecture tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      # Runs unit tests, the Konsist architecture tests, and the Testcontainers
+      # migration integration test (Docker is available on ubuntu runners).
+      - run: ./gradlew build
+
+  images:
+    name: Build both images, smoke-test native, publish on main
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build JVM dev image
+        uses: docker/build-push-action@v6
+        with:
+          context: api
+          file: api/Dockerfile.jvm
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE }}:jvm-sha-${{ steps.sha.outputs.short }}
+          build-args: |
+            GIT_SHA=${{ steps.sha.outputs.short }}
+
+      # A native compilation failure fails this step and the whole pipeline,
+      # surfacing native-only breakage on the commit that introduced it.
+      - name: Build GraalVM native production image
+        uses: docker/build-push-action@v6
+        with:
+          context: api
+          file: api/Dockerfile.native
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE }}:sha-${{ steps.sha.outputs.short }}
+          build-args: |
+            GIT_SHA=${{ steps.sha.outputs.short }}
+
+      - name: Native image smoke test
+        run: |
+          set -euo pipefail
+          SHORT="${{ steps.sha.outputs.short }}"
+          docker network create rewear-ci
+          docker run -d --name pg --network rewear-ci \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=rewear \
+            postgres:16.4-alpine
+          for i in $(seq 1 30); do docker exec pg pg_isready -U postgres && break; sleep 2; done
+          docker run -d --name api --network rewear-ci -p 8080:8080 \
+            -e DATABASE_HOST=pg -e DATABASE_PORT=5432 -e DATABASE_NAME=rewear \
+            -e DATABASE_USER=postgres -e DATABASE_PASSWORD=postgres \
+            -e S3_ENDPOINT=http://localhost:3900 -e S3_REGION=garage \
+            -e S3_ACCESS_KEY=ci -e S3_SECRET_KEY=ci -e S3_BUCKET=rewear-photos \
+            -e ZITADEL_ISSUER=http://localhost:8081 -e ZITADEL_JWKS_URL=http://localhost:8081/oauth/v2/keys \
+            "${IMAGE}:sha-${SHORT}"
+          ok=""
+          for i in $(seq 1 40); do
+            body="$(curl -s http://localhost:8080/health || true)"
+            if echo "$body" | grep -q "\"gitSha\":\"${SHORT}\""; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then echo "health check failed"; docker logs api; exit 1; fi
+          echo "health: $body"
+          curl -sf http://localhost:8080/internal/resize-check | grep -q '"ok":true'
+          echo "resize spike ok"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish both images (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          SHORT="${{ steps.sha.outputs.short }}"
+          docker tag "${IMAGE}:sha-${SHORT}" "${IMAGE}:latest"
+          docker push "${IMAGE}:sha-${SHORT}"
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:jvm-sha-${SHORT}"

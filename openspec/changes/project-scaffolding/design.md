@@ -185,6 +185,22 @@ before upload, and revisit ADR-12/ADR-13.
 **Why in scaffolding:** ADR-13 names this the weakest area of native-image
 support; proving it now prevents Listings from being built on a false premise.
 
+**Spike outcome (recorded during implementation): server-side resizing is
+CONFIRMED under the GraalVM native image.** The resize path was verified both on
+the JVM (unit test + running app) and in the compiled native production image,
+producing the fixed variants from the 1200×900 sample (thumbnail 150×113, detail
+800×600) via `GET /internal/resize-check`. The native image runs headless
+(`java.awt.headless=true`); making AWT/ImageIO work under native required:
+(1) generating reachability metadata with the GraalVM tracing agent (it captures
+the ImageIO SPI service files and reflection), (2) **shipping the JDK AWT shared
+libraries** (`libawt.so`, `libawt_headless.so`, `libjavajpeg.so`, `liblcms.so`,
+`libfontmanager.so`) next to the native binary — GraalVM emits them beside the
+executable and ImageIO loads them relative to it, and (3) `libfreetype6` +
+`fontconfig` in the runtime base image. The native image boots in ~2 s at ~35 MB
+RSS. Server-side resizing is therefore the confirmed approach for the Listings
+change; the client-side fallback is not needed. The CI native smoke test guards
+against regressions on every commit.
+
 ### D6: CI — build both images, push to GHCR, smoke-test the native binary
 
 GitHub Actions on push to main:
