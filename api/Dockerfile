@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# JVM dev image: fat jar on a JRE base. Config comes entirely from env vars (ADR-9).
+# The rewear-api image: fat jar on a JRE base, used for both dev and production
+# (ADR-13 — the native image was dropped). Config comes entirely from env vars (ADR-9).
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 COPY . .
@@ -13,4 +14,5 @@ ARG GIT_SHA=unknown
 ENV GIT_SHA=$GIT_SHA
 COPY --from=build /workspace/app/build/libs/app-all.jar /app/rewear-api.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/rewear-api.jar"]
+# Cap the heap to the container's memory limit so the JVM behaves on the ~4GB VPS (ADR-10).
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/rewear-api.jar"]

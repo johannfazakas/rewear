@@ -10,13 +10,13 @@ single admin, starting as a proof of concept.
 under [`api/`](api/): the `common` / `users` / `catalog` / `app` module seams
 with compiler- and Konsist-enforced boundaries, a `GET /health` endpoint
 reporting the build's git SHA, R2DBC + per-module Flyway migrations, a local
-`docker compose` dev stack (Postgres, Zitadel, Garage), Dockerfiles for the JVM
-dev image and the GraalVM native production image, and a CI pipeline that builds
-both images and smoke-tests the native binary. The ADR-13 photo-resize spike is
-**confirmed under the native image** (boots ~2 s, ~35 MB RSS), so server-side
-resizing is the path forward. No product features yet — the modules are empty
-boundaries. Next up: the "Production environment" change on the
-[roadmap](docs/ROADMAP.md).
+`docker compose` dev stack (Postgres, Zitadel, Garage), a Dockerfile building
+the `rewear-api` JVM image (used for both dev and production), and a CI pipeline
+that builds the image and smoke-tests it end-to-end. The ADR-12 photo-resize
+path is verified by that smoke test. (GraalVM native image was the original
+production target but was dropped — see ADR-13.) No product features yet — the
+modules are empty boundaries. Next up: the "Production environment" change on
+the [roadmap](docs/ROADMAP.md).
 
 ## What it will do (iteration 1)
 
@@ -30,7 +30,7 @@ boundaries. Next up: the "Production environment" change on the
 
 | Layer | Choice |
 |---|---|
-| Backend | Kotlin + Ktor (CIO), modular monolith, GraalVM native image |
+| Backend | Kotlin + Ktor (CIO), modular monolith on the JVM (JDK 25) |
 | Build | Gradle (Kotlin DSL), `buildSrc` convention plugins, version catalog |
 | DI / serialization | Koin (no classpath scanning), kotlinx.serialization |
 | Persistence | Exposed R2DBC (`r2dbc-postgresql` + pool) on the request path; Flyway (pgJDBC) for migrations, per-module history tables |
@@ -70,17 +70,14 @@ curl localhost:8080/internal/resize-check
 The API reads all configuration from environment variables (ADR-9), so the same
 build runs against the dev stack or production backends by changing env only.
 
-### Images
+### Image
 
 ```bash
-# JVM dev image
-docker build -f api/Dockerfile.jvm  --build-arg GIT_SHA=$(git rev-parse --short HEAD) -t rewear-api:jvm api
-# GraalVM native production image
-docker build -f api/Dockerfile.native --build-arg GIT_SHA=$(git rev-parse --short HEAD) -t rewear-api:native api
+docker build -f api/Dockerfile --build-arg GIT_SHA=$(git rev-parse --short HEAD) -t rewear-api api
 ```
 
-CI builds both on every push/PR, smoke-tests the native binary (`/health` +
-resize path), and on `main` publishes them to GHCR tagged `sha-<short>` and
+CI builds the image on every push/PR, smoke-tests it (`/health` + resize path),
+and on `main` publishes it to GHCR tagged `sha-<short>` and
 `latest`. The `rewear-api` GHCR package is made **public** once (repo → Packages →
 Package settings → Change visibility) so pulls need no auth and the 500 MB
 private-storage cap does not apply (ADR-10).

@@ -12,7 +12,6 @@ konsist = "0.17.3"
 logback = "1.5.12"
 junit = "5.11.3"
 testcontainers = "1.20.4"
-native-build-tools = "1.1.12"
 
 [libraries]
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -56,4 +55,3 @@ testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
-graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "native-build-tools" }

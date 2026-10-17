@@ -278,15 +278,17 @@ backups to B2) with a database + role per project — never schema-per-project
 — Zitadel's database included.
 
 Registry & versioning (2026-09): images live on GHCR. Two first-party images,
-always built together from the same commit: `rewear-api` (native binary) and
+always built together from the same commit: `rewear-api` (JVM image — fat jar on
+a Temurin JRE; see ADR-13, which superseded the original native binary) and
 `rewear-proxy` (Caddy with both React apps' static builds baked in, so deploy
 and rollback are atomic across web + API). Third-party images (Postgres,
 Zitadel, Garage) are pinned to exact upstream versions in compose, upgraded
 deliberately. Every push to main tags both images `sha-<short>` (immutable)
 plus `latest` (convenience only); production compose pins the SHA tag via
 env var — deploy = bump tag + `compose up`, rollback = previous tag. No
-SemVer (no external consumers). `linux/amd64` only (x86 VPS; native images
-are per-arch). The API's `/health` reports its git SHA. GHCR private-package
+SemVer (no external consumers). `linux/amd64` only (matches the x86 VPS; the
+JVM image is arch-portable but there is no second target to build for). The
+API's `/health` reports its git SHA. GHCR private-package
 storage is limited (500MB free) — make packages public or add a prune
 workflow; decide at repo creation. **Why:** cheapest real hosting; Compose maximizes
 iteration-1 momentum while the container rule keeps the k8s door fully open;
@@ -330,6 +332,30 @@ the extraction seam exists if ever needed); Cloudflare image resizing (paid,
 proprietary — violates ADR-9); serving originals (unusable).
 
 ### ADR-13: GraalVM native image as the API's production target
+
+**Superseded 2026-10-17 (`bump-jdk25-drop-native` change).** The API now ships
+as a **plain JVM image** (fat jar on a Temurin JRE, heap capped with
+`-XX:MaxRAMPercentage`), not a GraalVM native image — i.e. the "plain JVM with a
+tuned small heap" alternative this ADR originally rejected. **Why reversed:** at
+POC scale the native path's ongoing cost outweighed its memory saving. Bringing
+the toolchain to GraalVM 25 made that cost concrete — a hand-maintained AWT/Java2D
+**JNI** reachability net the tracing agent cannot derive (the resize path crashed
+at `Toolkit.loadLibraries` until it was hand-written), a ~5-minute `nativeCompile`
+on every CI push, and library constraints kept solely for native compatibility.
+The memory trade is accepted: ~300–500MB RSS vs. ~50–150MB native, on a ~4GB VPS
+where Zitadel is the main tenant. **Named trigger to revisit:** if the VPS gets
+memory-tight (more tenants, or the k3s migration), either tune the heap harder or
+reconsider native then — when the toolchain is more mature and the metadata story
+is simpler. Consequence for ADR-13's revision below: the **R2DBC→blocking-JDBC
+fallback is no longer forced by native-image metadata** (there is none); R2DBC
+stays on its own merits, and a future move to JDBC is now a free-standing
+decision, not a native-driven one. The native-friendly *library* choices
+(kotlinx.serialization, Ktor CIO, no classpath-scanning DI, no Hibernate/JPA,
+Flyway) are kept — they remain sensible on the JVM and nothing depends on
+reversing them. The JDK-25 toolchain cascade (Gradle 9.7.1, Kotlin 2.2.21, Ktor
+3.5.2) is unrelated to native and was retained.
+
+_Original decision, retained for history:_
 
 The Ktor API compiles to a GraalVM native image for production (~50–150MB
 RSS vs. 300–500MB on the JVM — real headroom on a shared 4GB VPS; ~50ms

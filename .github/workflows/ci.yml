@@ -30,8 +30,8 @@ jobs:
       # migration integration test (Docker is available on ubuntu runners).
       - run: ./gradlew build
 
-  images:
-    name: Build both images, smoke-test native, publish on main
+  image:
+    name: Build image, smoke-test, publish on main
     needs: build-test
     runs-on: ubuntu-latest
     steps:
@@ -43,31 +43,18 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build JVM dev image
+      - name: Build the rewear-api image
         uses: docker/build-push-action@v6
         with:
           context: api
-          file: api/Dockerfile.jvm
-          platforms: linux/amd64
-          load: true
-          tags: ${{ env.IMAGE }}:jvm-sha-${{ steps.sha.outputs.short }}
-          build-args: |
-            GIT_SHA=${{ steps.sha.outputs.short }}
-
-      # A native compilation failure fails this step and the whole pipeline,
-      # surfacing native-only breakage on the commit that introduced it.
-      - name: Build GraalVM native production image
-        uses: docker/build-push-action@v6
-        with:
-          context: api
-          file: api/Dockerfile.native
+          file: api/Dockerfile
           platforms: linux/amd64
           load: true
           tags: ${{ env.IMAGE }}:sha-${{ steps.sha.outputs.short }}
           build-args: |
             GIT_SHA=${{ steps.sha.outputs.short }}
 
-      - name: Native image smoke test
+      - name: Image smoke test
         run: |
           set -euo pipefail
           SHORT="${{ steps.sha.outputs.short }}"
@@ -102,7 +89,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish both images (main only)
+      - name: Publish the image (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
@@ -110,4 +97,3 @@ jobs:
           docker tag "${IMAGE}:sha-${SHORT}" "${IMAGE}:latest"
           docker push "${IMAGE}:sha-${SHORT}"
           docker push "${IMAGE}:latest"
-          docker push "${IMAGE}:jvm-sha-${SHORT}"

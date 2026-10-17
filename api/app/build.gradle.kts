@@ -2,7 +2,6 @@ plugins {
     id("rewear.kotlin-common")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
-    alias(libs.plugins.graalvm.native)
 }
 
 application {
@@ -41,24 +40,4 @@ dependencies {
     testImplementation(libs.testcontainers.core)
     testImplementation(libs.testcontainers.junit)
     testImplementation(libs.testcontainers.postgresql)
-}
-
-graalvmNative {
-    metadataRepository {
-        enabled.set(true)
-    }
-    binaries {
-        named("main") {
-            imageName.set("rewear-api")
-            buildArgs.add("--no-fallback")
-            buildArgs.add("-Djava.awt.headless=true")
-            buildArgs.add("-H:+ReportExceptionStackTraces")
-            buildArgs.add(
-                "--initialize-at-build-time=" +
-                    "ch.qos.logback,org.slf4j," +
-                    "kotlin.DeprecationLevel,kotlin.annotation.AnnotationRetention," +
-                    "kotlin.annotation.AnnotationTarget,kotlin.coroutines.intrinsics.CoroutineSingletons",
-            )
-        }
-    }
 }

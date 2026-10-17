@@ -11,19 +11,14 @@ anticipated and why it is sequenced this way.
 1. **Project scaffolding** — ✅ **done** (see [`api/`](../api/), `docker-compose.yml`,
    `.github/workflows/ci.yml`). Ktor modular-monolith skeleton with the refined
    ADR-4 seams (`common` / `users` / `catalog` / `app`; listings, categories,
-   favorites are packages in `catalog`), native-friendly library baseline per
-   ADR-13 (Ktor CIO, kotlinx.serialization, Koin, Exposed R2DBC, Flyway), local
-   `docker compose` (Postgres, Zitadel, Garage), `/health` reporting the git SHA,
-   and CI building both a JVM dev image and the GraalVM native production image to
-   GHCR with a smoke test against the native binary. **The ADR-13 image-resize
-   spike is confirmed under the native image** (server-side resizing works; no
-   client-side fallback needed). The native image boots in ~2 s at ~35 MB RSS.
-   Follow-ups surfaced during the native build: reachability metadata is generated
-   via the GraalVM tracing agent and validated by the CI native build each commit
-   (documented fallback if R2DBC/Netty ever proves intractable is blocking JDBC +
-   HikariCP, ADR-13 revision); Flyway can't scan classpath dirs in a native image,
-   so native runs migrations from filesystem-baked SQL (D9's later move of
-   migrations to a pre-deploy step will retire this).
+   favorites are packages in `catalog`), library baseline (Ktor CIO,
+   kotlinx.serialization, Koin, Exposed R2DBC, Flyway), local `docker compose`
+   (Postgres, Zitadel, Garage), `/health` reporting the git SHA, and CI building
+   the `rewear-api` JVM image to GHCR with an end-to-end smoke test. **The ADR-12
+   image-resize path works server-side** (no client-side fallback needed).
+   (Scaffolding originally shipped a GraalVM native production image; it was
+   dropped in favour of a plain JVM image before reaching `main` — see ADR-13 and
+   the `bump-jdk25-drop-native` change.)
 2. **Production environment** — VPS compose stack behind Caddy, deploy
    pipeline, and a documented manual `pg_dump`-to-B2 command (scheduled
    backups are deferred to the k3s change per ADR-11). Depends on the manual
@@ -48,26 +43,25 @@ anticipated and why it is sequenced this way.
 
 ## Later — deferred by explicit decision
 
-- **Lift the Kotlin JVM bytecode target 24 → 25** — the `bump-to-graalvm-25` change put
-  the toolchain on GraalVM 25 (JDK 25) but caps bytecode at **JVM 24**, because no
-  released Kotlin exposes `JvmTarget.JVM_25` (2.2.21 maxes at 24). Once a Kotlin release
-  adds JVM 25, bump `jvmTarget` (and the aligned Java `source/targetCompatibility`) from
-  24 to 25. Purely cosmetic alignment — the native image and JDK 25 runtime already
-  consume JVM 24 bytecode fine — so low urgency.
+- **Lift the Kotlin JVM bytecode target 24 → 25** — the toolchain is on JDK 25 but
+  caps bytecode at **JVM 24**, because no released Kotlin exposes `JvmTarget.JVM_25`
+  (2.2.21 maxes at 24). Once a Kotlin release adds JVM 25, bump `jvmTarget` (and the
+  aligned Java `source/targetCompatibility`) from 24 to 25. Purely cosmetic
+  alignment — the JDK 25 runtime consumes JVM 24 bytecode fine — so low urgency.
 
-  _Done (see `openspec/changes/archive/…/bump-to-graalvm-25`): GraalVM 25 / JDK 25,
-  native-build-tools 1.1.12, and — forced by JDK 25 — Gradle 9.7.1, Kotlin 2.2.21, Ktor
-  3.5.2. Unified `reachability-metadata.json` (agent-generated reflection+resources in
-  `com.rewear/app/`, hand-maintained AWT/Java2D JNI in `com.rewear/awt/`), `-H` resource
-  args dropped. Verified by a native smoke test on the Linux production image._
+  _Toolchain delivered by the `bump-jdk25-drop-native` change (JDK 25, Gradle 9.7.1,
+  Kotlin 2.2.21, Ktor 3.5.2; bytecode still JVM 24). That same change dropped the
+  GraalVM native image for a plain JVM production image — see ADR-13._
 
-- **CI path filters — build images only for actual code changes** — the
-  `.github/workflows/ci.yml` pipeline currently runs on every push to `main`,
-  including docs/`openspec/**`-only commits, so a one-line README or spec change
-  triggers the full ~5-minute GraalVM native build, smoke test, and GHCR
-  republish. Add `paths-ignore:` (or path filters) so non-code changes skip the
-  image pipeline (and ideally run only the JVM tests, or nothing). Small tooling
-  optimization; do it opportunistically alongside the next `ci.yml` edit.
+- **CI path filters — build the image only for actual code changes** — the
+  `.github/workflows/ci.yml` pipeline runs on every push to `main`, including
+  docs/`openspec/**`-only commits, so a one-line README or spec change still
+  triggers an image build, smoke test, and GHCR republish. Add `paths-ignore:`
+  (or path filters) so non-code changes skip the image pipeline (and ideally run
+  only the JVM tests, or nothing). Lower urgency now that dropping the GraalVM
+  native image (ADR-13) removed the ~5-minute `nativeCompile` — the JVM image
+  build is much cheaper — but still worth doing opportunistically alongside the
+  next `ci.yml` edit.
 
 - **Member contact mechanism** — how buyers reach sellers. Mechanism
   undecided (reveal contact info vs. email relay vs. in-app chat); the choice
